@@ -1,0 +1,41 @@
+{
+    "module_names": [
+        "preprocessing.multi_norm",
+        "preprocessing.gaussian_receptive_fields",
+        "networks.probabilistic_correlation_classwise_network"
+    ],
+    "model_name": "ProbCCN",
+    "dataset": "iris",
+    "plasticity": "stdp_nn_restr_synapse",
+    "cv": true,
+    "MultiNorm": {
+        "type": "mms"
+    },
+    "GaussianReceptiveFields": {
+        "n_fields": 20
+    },
+    "ProbabilisticCorrelationClasswiseNetwork": {
+        "n_estimators": 1,
+        "max_samples": 1.0,
+        "max_features": 1.0,
+        "min_spikes": 10,
+        "rate": 100,
+        "tau_plus": 5.0,
+        "sigma_w": 0.0,
+        "w_init": 0.0001,
+        "mu_plus": 0.0,
+        "mu_minus": 0.0,
+        "n_fields": 20,
+        "synapse_model": "stdp_nn_restr_synapse",
+        "bootstrap_features": false,
+        "early_stopping": false,
+        "quiet": false
+    },
+    "results": [
+        0.9666666666666667, NaN, NaN,
+        0.9333333333333333,
+        0.9666666666666667
+    ],
+    "mean": NaN,
+    "std": NaN
+}
