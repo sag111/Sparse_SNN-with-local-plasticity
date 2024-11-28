@@ -36,6 +36,7 @@ class ProbabilisticCorrelationClasswiseNetwork(BaseClasswiseBaggingNetwork):
         Wmax=1.0, # max synaptic weight
         mu_plus=0.0,
         mu_minus=0.0,
+        alpha=1.0,
         learning_rate = 0.01,
         rate = 500,
         resolution=0.1,
@@ -58,6 +59,7 @@ class ProbabilisticCorrelationClasswiseNetwork(BaseClasswiseBaggingNetwork):
             Wmax=Wmax,
             mu_plus=mu_plus,
             mu_minus=mu_minus,
+            alpha=alpha,
             n_estimators=n_estimators,
             max_features=max_features,
             max_samples=max_samples,
@@ -141,8 +143,9 @@ class ProbabilisticCorrelationClasswiseNetwork(BaseClasswiseBaggingNetwork):
                         class_indices.append(c)
 
             weights = np.random.rand(len(feature_indices)) * self.w_init
-            
+            delay = np.ones(len(feature_indices)) * self.resolution
             synapse_parameters.update(weight=weights)
+            synapse_parameters.update(delay=delay)
 
         if testing_mode:
             synapse_parameters = disable_plasticity(synapse_parameters)
@@ -283,7 +286,7 @@ class ProbabilisticCorrelationClasswiseNetwork(BaseClasswiseBaggingNetwork):
             pre=generators_ids,
             post=inputs_ids,
             conn_spec="one_to_one",
-            syn_spec="static_synapse",
+            syn_spec={"synapse_model":"static_synapse", "delay":[self.resolution] * len(generators_ids)},
         )
 
         #if spike_recorder_id is None:
@@ -302,7 +305,7 @@ class ProbabilisticCorrelationClasswiseNetwork(BaseClasswiseBaggingNetwork):
                 pre=teacher_ids,
                 post=neuron_ids,
                 conn_spec="one_to_one",
-                syn_spec="static_synapse",
+                syn_spec={"synapse_model":"static_synapse", "delay":[self.resolution] * len(teacher_ids)},
             )
 
         if spike_recorder_id is not None:
@@ -374,16 +377,21 @@ class ProbabilisticCorrelationClasswiseNetwork(BaseClasswiseBaggingNetwork):
 
                 if not testing_mode:
 
-                    teacher_list = [{"spike_times":list(self.encoder.ref_times + sample_time) 
+                    # add resolution here to make dt = 2*delay
+                    teacher_list = [{"spike_times":list(self.encoder.ref_times + sample_time + self.resolution) 
                                      if current_neuron in active_neurons[vector_number] else []} 
                                     for current_neuron in range(self.n_estimators*len(self.classes_))]
 
                     nest.SetStatus(self.network_objects.teacher_ids, teacher_list)
 
-                    neuron_list = [{"I_syn": 0.0 if current_neuron in active_neurons[vector_number] else -1000.0}
+                    neuron_list = [{"I_syn": 0.0 if current_neuron in active_neurons[vector_number] else -1e7}
                                    for current_neuron in range(self.n_estimators*len(self.classes_))]
                     
                     nest.SetStatus(self.network_objects.neuron_ids, neuron_list)
+
+                #breakpoint()
+                # (Pdb) earliest_in = min([min(item["spike_times"]) for item in inp_time_list if len(item["spike_times"]) > 0])
+                # (Pdb) earliest_out = min([min(item["spike_times"]) for item in teacher_list if len(item["spike_times"]) > 0])
                 
                 nest.Simulate(self.time)
 
@@ -407,7 +415,7 @@ class ProbabilisticCorrelationClasswiseNetwork(BaseClasswiseBaggingNetwork):
                     
                     for n_idx, current_neuron in enumerate(self.network_objects.neuron_ids):
                         #output_correlations[vector_number, n_idx] = np.sum(all_spikes['senders'] == current_neuron) #self._decode_spikes(all_spikes, current_neuron, sample_time)
-                        class_times = np.array(all_spikes["times"])[all_spikes['senders'] == current_neuron] - sample_time - 2.0
+                        class_times = np.array(all_spikes["times"])[all_spikes['senders'] == current_neuron] - sample_time - 2*self.resolution # subtract 2*dendritic_delay, which is = resoluton
                         class_times = (class_times/self.resolution).astype(np.int32)
                         class_spikes = np.zeros(N)
                         class_spikes[class_times[class_times < N]] = 1
