@@ -29,9 +29,9 @@ class BaseClasswiseBaggingNetwork(BaseSpikingTransformer):
         n_estimators=1, # number of sub-networks
         max_features=1., # number of features for each sub-network
         max_samples=1., # number of samples for each sub-network
-        #w_inh=None,
+        alpha=1.0,
         w_init=1.0,
-        #weight_normalization=None,
+        resolution=0.1,
         bootstrap_features=False,
         random_state=None,
         **kwargs,
@@ -41,10 +41,12 @@ class BaseClasswiseBaggingNetwork(BaseSpikingTransformer):
         self.max_features = max_features
         self.max_samples = max_samples
         self.bootstrap_features = bootstrap_features
+        self.resolution = resolution
         #self.weight_normalization = weight_normalization
         #self.w_inh = w_inh
 
         self.w_init = w_init
+        self.alpha = alpha
 
         if n_fields is not None:
             self.n_fields = int(n_fields)
@@ -109,6 +111,7 @@ class BaseClasswiseBaggingNetwork(BaseSpikingTransformer):
             synapse_parameters["Wmax"] = self.Wmax
             synapse_parameters["mu_plus"] = self.mu_plus
             synapse_parameters["mu_minus"] = self.mu_minus
+            synapse_parameters["alpha"] = self.alpha
 
         if hasattr(self, 'weights_'):
             synapse_parameters.update(weight=self.weights_['weight'])
@@ -152,8 +155,10 @@ class BaseClasswiseBaggingNetwork(BaseSpikingTransformer):
                         class_indices.append(c)
 
             weights = np.random.rand(len(feature_indices)) * self.w_init
+            delay = np.ones(len(feature_indices)) * self.resolution
             
             synapse_parameters.update(weight=weights)
+            synapse_parameters.update(delay=delay)
 
         if testing_mode:
             synapse_parameters = disable_plasticity(synapse_parameters)
@@ -220,7 +225,7 @@ class BaseClasswiseBaggingNetwork(BaseSpikingTransformer):
             pre=generators_ids,
             post=inputs_ids,
             conn_spec="one_to_one",
-            syn_spec="static_synapse",
+            syn_spec={"synapse_model":"static_synapse", "delay":[self.resolution]*len(generators_ids)},
         )
 
         nest.Connect(
@@ -235,7 +240,7 @@ class BaseClasswiseBaggingNetwork(BaseSpikingTransformer):
                 pre=teacher_ids,
                 post=neuron_ids,
                 conn_spec="one_to_one",
-                syn_spec="static_synapse",
+                syn_spec={"synapse_model":"static_synapse", "delay":[self.resolution]*len(teacher_ids)},
             )
 
         #if self.w_inh is not None and teacher_ids is not None:
